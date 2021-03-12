@@ -1,0 +1,52 @@
+version: '3'
+
+services:  
+    dind:
+        image: docker:18.09-dind
+        container_name: dind
+        restart: always
+        privileged: true
+        volumes:
+            - /var/lib/docker
+        command: 
+            - --storage-driver=overlay2
+        networks: 
+            - netrunner
+        
+    runner:
+        image: gitlab/gitlab-runner:alpine
+        container_name: runner
+        restart: always
+        volumes:
+            - ./gitlab/runner:/etc/gitlab-runner:Z
+            - /var/run/docker.sock:/var/run/docker.sock
+        environment:
+            - DOCKER_HOST=tcp://dind:2375
+        links:
+            - dind
+        networks: 
+            - netrunner
+
+    register-runner:
+      image: gitlab/gitlab-runner:alpine
+      container_name: register-runner
+      restart: 'no'
+      volumes:
+          - ./gitlab/runner:/etc/gitlab-runner:Z
+      command:
+          - register
+          - -non-interactive
+          - -locked=false
+          - -name=Docker Runner
+          - -executor=docker
+          - -docker-image=docker:17.06.0-ce-dind
+          - -docker-volumes=/var/run/docker.sock:/var/run/docker.sock
+      environment:
+          - CI_SERVER_URL= https://gitlab.com/
+          - REGISTRATION_TOKEN=<***SEU-TOKEN***>
+      networks:
+          - netrunner
+
+networks: 
+    netrunner:
+        driver: bridge
